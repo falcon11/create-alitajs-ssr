@@ -1,0 +1,39 @@
+{
+  "name": "create-alitajs-ssr",
+  "version": "0.0.1",
+  "description": "create alitajs ssr project with eggjs",
+  "keywords": [
+    "alitajs",
+    "ssr",
+    "eggjs"
+  ],
+  "author": "Ashoka <savebtc11@gmail.com>",
+  "homepage": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "files": [
+    "index.js",
+    "createAlitajsSsr.js",
+    "template"
+  ],
+  "bin": {
+    "create-alitajs-ssr": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: run tests from root\" && exit 1",
+    "build": "webpack --config webpack.config.js"
+  },
+  "dependencies": {
+    "chalk": "^4.0.0",
+    "commander": "^8.3.0",
+    "cross-spawn": "^7.0.3",
+    "fs-extra": "^10.0.0",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "jest": "^27.4.5"
+  }
+}
