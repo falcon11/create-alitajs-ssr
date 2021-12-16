@@ -1,11 +1,9 @@
 # `create-alitajs-ssr`
 
-> TODO: description
+Create alitajs ssr project with eggjs
 
 ## Usage
 
-```
-const createAlitajsSsr = require('create-alitajs-ssr');
-
-// TODO: DEMONSTRATE API
+```sh
+yarn create alitajs-ssr [appName]
 ```

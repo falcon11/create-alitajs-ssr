@@ -141,6 +141,11 @@ function initEgg(root) {
     path.resolve(__dirname, 'template/egg/app/router.js'),
     path.resolve(root, 'app/router.js')
   );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/test'),
+    path.resolve(root, 'test')
+  );
 }
 
 function initAlita(root) {
