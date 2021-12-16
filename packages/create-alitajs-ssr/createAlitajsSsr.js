@@ -2,10 +2,10 @@
 
 const commander = require('commander');
 const chalk = require('chalk');
-const execSync = require('child_process').execSync;
 const fs = require('fs-extra');
 const spawn = require('cross-spawn');
 const path = require('path');
+const mustache = require('mustache');
 
 const packageJson = require('./package.json');
 
@@ -45,38 +45,39 @@ function init() {
 
 function createApp(name) {
   const root = path.resolve(name);
-  const appName = path.basename(root);
-  console.log('root', root, 'app name', appName);
 
   fs.ensureDirSync(name);
   process.chdir(root);
 
-  run(root, appName);
+  run(root);
 }
 
-function run(root, appName) {
+function run(root) {
   initEgg(root);
   const alitaPath = initAlita(root);
   const eggPackageJsonPath = path.resolve(root, 'package.json');
   const alitaPackageJsonPath = path.resolve(alitaPath, 'package.json');
   const eggPackageJson = require(eggPackageJsonPath);
   const alitaPackageJson = require(alitaPackageJsonPath);
-  console.log(
-    'eggPackageJson',
-    eggPackageJson,
-    'alitaPackageJson',
-    alitaPackageJson
-  );
   fs.writeFileSync(
     eggPackageJsonPath,
     JSON.stringify(
       mergePackageJson(
         eggPackageJson,
         alitaPackageJson,
-        path.relative(alitaPath, root)
-      )
+        path.relative(root, alitaPath)
+      ),
+      null,
+      2
     )
   );
+  // install dependencies
+  installDependencies();
+  installDependencies('egg-view-assets');
+  installDependencies('egg-view-nunjucks');
+  installDependencies('mime');
+  installDependencies('dayjs');
+  installDependencies('qs');
 }
 
 function initEgg(root) {
@@ -90,18 +91,61 @@ function initEgg(root) {
     process.exit(1);
   }
   fs.copySync(
-    path.resolve(__dirname, 'template/eslintignore.tpl'),
+    path.resolve(__dirname, 'template/egg/eslintignore.tpl'),
     path.resolve(root, '.eslintignore')
   );
   fs.copySync(
-    path.resolve(__dirname, 'template/gitignore.tpl'),
+    path.resolve(__dirname, 'template/egg/gitignore.tpl'),
     path.resolve(root, '.gitignore')
+  );
+
+  let configDefault = fs.readFileSync(
+    path.resolve(__dirname, 'template/egg/config/config.default.tpl'),
+    'utf-8'
+  );
+  configDefault = mustache.render(configDefault, {
+    appKey: generateAppKey(),
+    alitaPath: path.relative(root, getAlitaPath(root)),
+  });
+  fs.writeFileSync(
+    path.resolve(root, 'config/config.default.js'),
+    configDefault
+  );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/config/plugin.js'),
+    path.resolve(root, 'config/plugin.js')
+  );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/config/config.local.js'),
+    path.resolve(root, 'config/config.local.js')
+  );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/app/controller'),
+    path.resolve(root, 'app/controller')
+  );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/app/service'),
+    path.resolve(root, 'app/service')
+  );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/app/view'),
+    path.resolve(root, 'app/view')
+  );
+
+  fs.copySync(
+    path.resolve(__dirname, 'template/egg/app/router.js'),
+    path.resolve(root, 'app/router.js')
   );
 }
 
 function initAlita(root) {
   const originalCwd = process.cwd();
-  const appPath = path.resolve(root, 'app');
+  const appPath = getAppPath(root);
   process.chdir(appPath);
   const alitaInitCommand = 'yarn';
   const alitaInitOptions = ['create', 'alita', 'web'];
@@ -113,7 +157,7 @@ function initAlita(root) {
     console.error('alita init fail', alitaInitOutput.error);
     process.exit(1);
   }
-  const alitaPath = path.resolve(appPath, 'web');
+  const alitaPath = getAlitaPath(root);
   // copy config.ts
   fs.copySync(
     path.resolve(__dirname, 'template/alita/config.tpl'),
@@ -124,7 +168,21 @@ function initAlita(root) {
     path.resolve(__dirname, 'template/alita/env.tpl'),
     path.resolve(alitaPath, '.env')
   );
+
+  // copy src
+  fs.copySync(
+    path.resolve(__dirname, 'template/alita/src'),
+    path.resolve(alitaPath, 'src')
+  );
   return alitaPath;
+}
+
+function getAppPath(root) {
+  return path.join(root, 'app');
+}
+
+function getAlitaPath(root) {
+  return path.resolve(getAppPath(root), 'web');
 }
 
 function mergePackageJson(eggPackageJson, alitaPackageJson, alitaPath) {
@@ -150,6 +208,9 @@ function mergePackageJson(eggPackageJson, alitaPackageJson, alitaPath) {
 
   // merge scripts
   eggPackageJson.scripts[
+    'start'
+  ] = `npm run build-web && ${eggPackageJson.scripts['start']}`;
+  eggPackageJson.scripts[
     'start-web'
   ] = `cross-env APP_ROOT=${alitaPath} alita dev`;
   eggPackageJson.scripts[
@@ -159,6 +220,27 @@ function mergePackageJson(eggPackageJson, alitaPackageJson, alitaPath) {
     'ci'
   ] = `npm run build-web && ${eggPackageJson.scripts['ci']}`;
   return eggPackageJson;
+}
+
+function installDependencies(packageName, isDev) {
+  const commander = 'yarn';
+  const options = [];
+  if (packageName) {
+    options.push('add');
+    options.push(packageName);
+  }
+  if (isDev) {
+    options.push('-D');
+  }
+  const output = spawn.sync(commander, options, { stdio: 'inherit' });
+  if (output.status !== 0) {
+    console.error('install dependencies fail', output.error);
+    process.exit(1);
+  }
+}
+
+function generateAppKey() {
+  return `_${new Date().getTime()}_${Math.round(Math.random() * 10000)}`;
 }
 
 module.exports = {
